@@ -1,0 +1,45 @@
+version: '3.4'
+
+services:
+  tmenos3.netcore.apidemo.api:
+    image: ${DOCKER_REGISTRY-}tmenos3netcoreapidemoapi
+    build:
+      context: .
+      dockerfile: src/TMenos3.NetCore.ApiDemo.API/Dockerfile
+    depends_on:
+      - rabbitmq
+      - mssql
+    environment:
+      - ConnectionStrings__DefaultConnection: "Server=mssql;Database=ApiDemo;User=sa;Password=123456;"
+      - FootballData__ApiToken: "971bd701486249ae8e6b8ede5bc7f689"
+      - EventBus__HostName: "rabbitmq"
+  tmenos3.netcore.apidemo.eventprocessor:
+    image: ${DOCKER_REGISTRY-}tmenos3netcoreapidemoeventprocessor
+    build:
+      context: .
+      dockerfile: src/TMenos3.NetCore.ApiDemo.EventProcessor/Dockerfile
+    depends_on:
+      - rabbitmq
+      - mssql
+    environment:
+      - ConnectionStrings__DefaultConnection: "Server=mssql;Database=ApiDemo;User=sa;Password=123456;"
+      - FootballData__ApiToken: "971bd701486249ae8e6b8ede5bc7f689"
+      - EventBus__HostName: "rabbitmq"
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    volumes:
+      - ./.docker/rabbitmq/etc/:/etc/rabbitmq/
+      - ./.docker/rabbitmq/data/:/var/lib/rabbitmq/
+      - ./.docker/rabbitmq/logs/:/var/log/rabbitmq/
+    environment:
+      - RABBITMQ_ERLANG_COOKIE: 1WqgH8N2v1qDBDZDbNy8Bg9IkPWLEpu79m6q+0t36lQ=
+    ports:
+      - 5672:5672
+      - 15672:15672
+  mssql:
+    image: "mcr.microsoft.com/mssql/server"
+    environment:
+      - SA_PASSWORD: "123456"
+      - ACCEPT_EULA: "Y"
+      - MSSQL_PID: "Developer"

@@ -1,0 +1,94 @@
+version: '3.4'
+
+services:
+  tmenos3.netcore.apidemo.api:
+    build:
+      context: .
+      dockerfile: src/TMenos3.NetCore.ApiDemo.API/Dockerfile
+    depends_on:
+      - rabbitmq
+      - mssql
+      - elasticsearch
+      - redis
+    links:
+      - rabbitmq
+      - mssql
+      - elasticsearch
+      - redis
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mssql,1433;Database=ApiDemo;User=sa;Password=MSSQL2017Password;
+      - FootballData__ApiToken=971bd701486249ae8e6b8ede5bc7f689
+      - EventBus__HostName=rabbitmq
+      - LoggingOptions__Node=http://elasticsearch:9200/
+    ports:
+      - 8081:80
+
+  tmenos3.netcore.apidemo.eventprocessor:
+    build:
+      context: .
+      dockerfile: src/TMenos3.NetCore.ApiDemo.EventProcessor/Dockerfile
+    depends_on:
+      - rabbitmq
+      - mssql
+      - elasticsearch
+      - redis
+    links:
+      - rabbitmq
+      - mssql
+      - elasticsearch
+      - redis
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mssql,1433;Database=ApiDemo;User=sa;Password=MSSQL2017Password;
+      - FootballData__ApiToken=971bd701486249ae8e6b8ede5bc7f689
+      - EventBus__HostName=rabbitmq
+      - LoggingOptions__Node=http://elasticsearch:9200/
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=1WqgH8N2v1qDBDZDbNy8Bg9IkPWLEpu79m6q+0t36lQ=
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2017-latest-ubuntu
+    container_name: mssql
+    environment:
+      - SA_PASSWORD=MSSQL2017Password
+      - ACCEPT_EULA=Y
+      - MSSQL_PID=Developer
+    ports:
+      - "1433"
+
+  elasticsearch:
+   container_name: elasticsearch
+   image: docker.elastic.co/elasticsearch/elasticsearch:7.6.1
+   ports:
+    - 9200:9200
+   volumes:
+    - elasticsearch-data:/usr/share/elasticsearch/data
+   environment:
+    - xpack.monitoring.enabled=true
+    - xpack.watcher.enabled=false
+    - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    - discovery.type=single-node
+      
+  kibana:
+   container_name: kibana
+   image: docker.elastic.co/kibana/kibana:7.6.1
+   ports:
+    - 5601:5601
+   depends_on:
+    - elasticsearch
+   environment:
+    - ELASTICSEARCH_URL=http://elasticsearch:9200
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  elasticsearch-data:

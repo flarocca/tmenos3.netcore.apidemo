@@ -1,0 +1,305 @@
+# Namespace
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: tmenos3
+  labels:
+    name: tmenos3
+---
+# ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tmenos3-config
+  namespace: tmenos3
+data:
+  ConnectionStrings.DefaultConnection: "<<< DATABASE_CONNECTION_STRING >>>"
+  FootballData.ApiToken: "<<< API_TOKEN >>>"
+  EventBus.HostName: "<<< RABBITMQ_HOST >>>"
+---
+# Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tmenos3-mssql-secret
+  namespace: tmenos3
+type: Opaque
+data:
+  SA_PASSWORD: UGFzczEyMyQ=
+---
+# Ingress
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: tmenos3-ingress
+  namespace: tmenos3
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+spec:
+  rules:
+    - http:
+        paths:
+        - path: (/|$)(.*)
+          backend:
+            serviceName: tmenos3-demo-api-clusterip
+            servicePort: 80
+---
+# SQL Server PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tmenos3-claim-mssql
+  namespace: tmenos3
+spec:
+  storageClassName: <<< STORAGE_CLASS >>>
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# RabbitMQ PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tmenos3-claim-rabbitmq
+  namespace: tmenos3
+spec:
+  storageClassName: <<< STORAGE_CLASS >>>
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# SQL Server Instance
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tmenos3-mssql-server
+  namespace: tmenos3
+spec:
+  selector:
+    matchLabels:
+      app: tmenos3-mssql-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: tmenos3-mssql-server
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: tmenos3-mssql-server
+        image: mcr.microsoft.com/mssql/server:2017-latest
+        ports:
+        - containerPort: 1433
+        env:
+        - name: MSSQL_PID
+          value: "Developer"
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: tmenos3-mssql-secret
+              key: SA_PASSWORD 
+        volumeMounts:
+        - name: mssqldb
+          mountPath: /var/opt/mssql
+      volumes:
+      - name: mssqldb
+        persistentVolumeClaim:
+          claimName: tmenos3-claim-mssql
+---
+# RabbitMQ Instance
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tmenos3-rabbitmq-server
+  namespace: tmenos3
+spec:
+  replicas: 1
+  serviceName: tmenos3-rabbitmq-server
+  selector:
+    matchLabels:
+      app: tmenos3-rabbitmq-server
+  template:
+    metadata:
+      labels:
+        app: tmenos3-rabbitmq-server
+    spec:
+      containers:
+      - name: tmenos3-rabbitmq-server
+        image: rabbitmq:3-management
+        env:
+        - name: "RABBITMQ_ERLANG_COOKIE"
+          value: "1WqgH8N2v1qDBDZDbNy8Bg9IkPWLEpu79m6q+0t36lQ="
+        volumeMounts:
+        - mountPath: /var/lib/rabbitmq
+          name: rabbitmq-data
+      volumes:
+      - name: rabbitmq-data
+        persistentVolumeClaim:
+          claimName: tmenos3-claim-rabbitmq
+---
+# SQL Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: tmenos3-mssql-server
+  namespace: tmenos3
+spec:
+  selector:
+    app: tmenos3-mssql-server
+  ports:
+    - protocol: TCP
+      port: 1433
+      targetPort: 1433
+  type: NodePort
+---
+# RabbitMQ Service
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: rabbitmq
+  name: tmenos3-rabbitmq-server
+  namespace: tmenos3
+spec:
+  ports:
+  - protocol: TCP
+    port: 5672
+    targetPort: 5672
+  selector:
+    name: tmenos3-rabbitmq-server
+  type: NodePort
+---
+# Demo API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tmenos3-demo-api
+  namespace: tmenos3
+  labels:
+    app: tmenos3-demo-api
+spec:
+  selector:
+    matchLabels:
+      app: tmenos3-demo-api
+      role: api
+  replicas: 1
+  revisionHistoryLimit: 2
+  template:
+    metadata:
+      labels:
+        app: tmenos3-demo-api
+        role: api
+    spec:
+      containers:
+      - name: tmenos3-demo-api
+        image: '<<< DEMO_API_IMAGE_TAG >>>'
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "production"
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            configMapKeyRef:
+              name: tmenos3-config
+              key: ConnectionStrings.DefaultConnection
+        - name: FootballData__ApiToken
+          valueFrom:
+            configMapKeyRef:
+              name: tmenos3-config
+              key: FootballData.ApiToken
+        - name: EventBus__HostName
+          valueFrom:
+            configMapKeyRef:
+              name: tmenos3-config
+              key: EventBus.HostName
+        resources:
+          limits:
+            memory: 128Mi
+            cpu: 1
+          requests:
+            memory: 64Mi
+            cpu: 128m
+        ports:
+        - containerPort: 80
+        imagePullPolicy: Always
+      imagePullSecrets:
+        - name: <<< IMAGE_REGISTRY >>>
+---
+# Demo API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: tmenos3-demo-api-clusterip
+  namespace: tmenos3
+  labels:
+    app: tmenos3-demo-api
+    role: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+    protocol: TCP
+  selector:
+    app: tmenos3-demo-api
+    role: api
+---
+# Demo Event Processor
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tmenos3-demo-event-processor
+  namespace: tmenos3
+  labels:
+    app: tmenos3-demo-event-processor
+spec:
+  selector:
+    matchLabels:
+      app: tmenos3-demo-event-processor
+      role: event-processor
+  replicas: 1
+  revisionHistoryLimit: 2
+  template:
+    metadata:
+      labels:
+        app: tmenos3-demo-event-processor
+        role: event-processor
+    spec:
+      containers:
+      - name: tmenos3-demo-event-processor
+        image: '<<< DEMO_EVENT_PROCESSOR_IMAGE_TAG >>>'
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "production"
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            configMapKeyRef:
+              name: tmenos3-config
+              key: ConnectionStrings.DefaultConnection
+        - name: FootballData__ApiToken
+          valueFrom:
+            configMapKeyRef:
+              name: tmenos3-config
+              key: FootballData.ApiToken
+        - name: EventBus__HostName
+          valueFrom:
+            configMapKeyRef:
+              name: tmenos3-config
+              key: EventBus.HostName
+        resources:
+          limits:
+            memory: 128Mi
+            cpu: 1
+          requests:
+            memory: 64Mi
+            cpu: 128m
+        imagePullPolicy: Always
+      imagePullSecrets:
+        - name: <<< IMAGE_REGISTRY >>>

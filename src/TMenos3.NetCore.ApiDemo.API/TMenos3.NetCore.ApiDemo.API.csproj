@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <UserSecretsId>8a5bdf93-776f-49f0-b517-1ebce05a586e</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <Version>1.0.0.0</Version>
+    <DockerComposeProjectPath>..\..\docker-compose.dcproj</DockerComposeProjectPath>
+    <DockerfileContext>..\..</DockerfileContext>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="3.1.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.9.10" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="3.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TMenos3.NetCore.ApiDemo.Contracts\TMenos3.NetCore.ApiDemo.Contracts.csproj" />
+    <ProjectReference Include="..\TMenos3.NetCore.ApiDemo.Database\TMenos3.NetCore.ApiDemo.Database.csproj" />
+    <ProjectReference Include="..\TMenos3.NetCore.ApiDemo.Infrastructure.EventBus.RabbitMQ\TMenos3.NetCore.ApiDemo.Infrastructure.EventBus.RabbitMQ.csproj" />
+    <ProjectReference Include="..\TMenos3.NetCore.ApiDemo.Infrastructure\TMenos3.NetCore.ApiDemo.Infrastructure.csproj" />
+    <ProjectReference Include="..\TMenos3.NetCore.ApiDemo.Services\TMenos3.NetCore.ApiDemo.Services.csproj" />
+  </ItemGroup>
+
+
+</Project>

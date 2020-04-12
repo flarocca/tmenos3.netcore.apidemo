@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "TMenos3.NetCore.ApiDemo.EventProcessor": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
